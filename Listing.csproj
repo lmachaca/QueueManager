@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="wwwroot\Users\**" />
+    <Content Remove="wwwroot\Users\**" />
+    <EmbeddedResource Remove="wwwroot\Users\**" />
+    <None Remove="wwwroot\Users\**" />
+  </ItemGroup>
+
+</Project>

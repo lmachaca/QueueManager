@@ -1,0 +1,159 @@
+﻿
+@page "/"
+
+<PageTitle>Multi-Queue Manager</PageTitle>
+
+<div>
+    <div class="header-bar ">
+        <h1>Hey Meg!</h1>
+        <button class="btn-primary" @onclick="OpenAddStationModal">+ Add Station Card</button>
+    </div>
+
+    <!-- stations cards -->
+    <div class="card-grid">
+        @foreach (var station in stations)
+        {
+            <div class="station-card" >
+                <div class="station-header">
+                    <h2>@station.StationName</h2>
+                    <button class="btn-close-card" @onclick="() => DeleteStation(station)">✕</button>
+                </div>
+
+                <div class="queue-list">
+                    @if (station.Queue.Any())
+                    {
+                        @for (int i = 0; i < station.Queue.Count; i++)
+                        {
+                            var person = station.Queue[i];
+                            var isCurrentTurn = (i == 0); 
+
+                            <div class="queue-item @(isCurrentTurn ? "active-turn" : "")">
+                                <div class="person-info">
+                                    <span class="ticket-badge">#@person.TicketNumber</span>
+                                    <span class="person-name">@person.Name</span>
+                                </div>
+                                <button class="btn-remove-person" @onclick="() => RemovePersonFromQueue(station, person)">✕</button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="empty-queue-text">Line is empty</p>
+                    }
+                </div>
+
+                <button class="btn-add-line" @onclick="() => OpenAddPersonModal(station)">+ Add Name to Line</button>
+
+                
+                @if (station.ShowAddPersonModal)
+                {
+                    <div class="modal-overlay">
+                        <div class="modal-box">
+                            <h3>Add to @station.StationName's Line</h3>
+                            <input type="text"
+                                   @bind="station.NewPersonInput"
+                                   @bind:event="oninput"
+                                   placeholder="Enter person's name"
+                                   autofocus />
+                            <div class="modal-actions">
+                                <button class="btn-primary" @onclick="() => AddPersonToStation(station)">Add</button>
+                                <button class="btn-secondary" @onclick="() => CloseAddPersonModal(station)">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- new card creation -->
+    @if (showAddStationModal)
+    {
+        <div class="modal-overlay">
+            <div class="modal-box">
+                <h3>Create New Card</h3>
+                <input type="text" @bind="newStationNameInput" placeholder="Advisor's Name " autofocus />
+                <div class="modal-actions">
+                    <button class="btn-primary" @onclick="CreateStation">Create</button>
+                    <button class="btn-secondary" @onclick="CloseAddStationModal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    public class Person
+    {
+        public string Name { get; set; } = string.Empty;
+        public int TicketNumber { get; set; }
+
+    }
+    public class StationCard
+    {
+        public string StationName { get; set; } = string.Empty;
+        public List<Person> Queue { get; set; } = new List<Person>();
+        public bool ShowAddPersonModal { get; set; } = false;
+        public string NewPersonInput { get; set; } = string.Empty;
+
+        // Each station card maintains its own counter starting at 1
+        public int LocalTicketCounter { get; set; } = 1;
+    }
+    private List<StationCard> stations = new List<StationCard>();
+    private bool showAddStationModal = false;
+    private string newStationNameInput = string.Empty;
+    
+
+    // --- Station Card Management ---
+    private void OpenAddStationModal() => showAddStationModal = true;
+    private void CloseAddStationModal()
+    {
+        showAddStationModal = false;
+        newStationNameInput = string.Empty;
+    }
+
+    private void CreateStation()
+    {
+        if (!string.IsNullOrWhiteSpace(newStationNameInput))
+        {
+            stations.Add(new StationCard
+            {
+                StationName = newStationNameInput.Trim()
+            });
+            CloseAddStationModal();
+        }
+    }
+
+    private void DeleteStation(StationCard station)
+    {
+        stations.Remove(station);
+    }
+
+    // --- Queue Management Inside Each Card ---
+    private void OpenAddPersonModal(StationCard station) => station.ShowAddPersonModal = true;
+    private void CloseAddPersonModal(StationCard station)
+    {
+        station.ShowAddPersonModal = false;
+        station.NewPersonInput = string.Empty;
+    }
+
+    private void AddPersonToStation(StationCard station)
+    {
+        if (!string.IsNullOrWhiteSpace(station.NewPersonInput))
+        {
+            station.Queue.Add(new Person
+            {
+                Name = station.NewPersonInput.Trim(),
+                TicketNumber = station.LocalTicketCounter++ // Increments only THIS card's counter
+            });
+
+            CloseAddPersonModal(station);
+        }
+    }
+
+    private void RemovePersonFromQueue(StationCard station, Person person)
+    {
+        station.Queue.Remove(person);
+    }
+}
+    
