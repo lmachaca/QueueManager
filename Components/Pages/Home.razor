@@ -1,5 +1,8 @@
-﻿
+
 @page "/"
+@using Listing.Data
+@implements IDisposable
+@inject QueueService QueueService
 
 <PageTitle>Multi-Queue Manager</PageTitle>
 
@@ -16,7 +19,7 @@
             <div class="station-card" >
                 <div class="station-header">
                     <h2>@station.StationName</h2>
-                    <button class="btn-close-card" @onclick="() => DeleteStation(station)">✕</button>
+                    <button class="btn-close-card" @onclick="() => DeleteStation(station.Id)">✕</button>
                 </div>
 
                 <div class="queue-list">
@@ -32,7 +35,7 @@
                                     <span class="ticket-badge">#@person.TicketNumber</span>
                                     <span class="person-name">@person.Name</span>
                                 </div>
-                                <button class="btn-remove-person" @onclick="() => RemovePersonFromQueue(station, person)">✕</button>
+                                <button class="btn-remove-person" @onclick="() => RemovePersonFromQueue(person.Id)">✕</button>
                             </div>
                         }
                     }
@@ -45,19 +48,19 @@
                 <button class="btn-add-line" @onclick="() => OpenAddPersonModal(station)">+ Add Name to Line</button>
 
                 
-                @if (station.ShowAddPersonModal)
+                @if (addPersonStationId == station.Id)
                 {
                     <div class="modal-overlay">
                         <div class="modal-box">
                             <h3>Add to @station.StationName's Line</h3>
                             <input type="text"
-                                   @bind="station.NewPersonInput"
+                                   @bind="newPersonInput"
                                    @bind:event="oninput"
                                    placeholder="Enter person's name"
                                    autofocus />
                             <div class="modal-actions">
                                 <button class="btn-primary" @onclick="() => AddPersonToStation(station)">Add</button>
-                                <button class="btn-secondary" @onclick="() => CloseAddPersonModal(station)">Cancel</button>
+                                <button class="btn-secondary" @onclick="CloseAddPersonModal">Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -83,26 +86,28 @@
 </div>
 
 @code {
-    public class Person
-    {
-        public string Name { get; set; } = string.Empty;
-        public int TicketNumber { get; set; }
-
-    }
-    public class StationCard
-    {
-        public string StationName { get; set; } = string.Empty;
-        public List<Person> Queue { get; set; } = new List<Person>();
-        public bool ShowAddPersonModal { get; set; } = false;
-        public string NewPersonInput { get; set; } = string.Empty;
-
-        // Each station card maintains its own counter starting at 1
-        public int LocalTicketCounter { get; set; } = 1;
-    }
-    private List<StationCard> stations = new List<StationCard>();
+    private List<Station> stations = new List<Station>();
     private bool showAddStationModal = false;
     private string newStationNameInput = string.Empty;
-    
+
+    // Add-person modal is per browser, so it stays here instead of the database
+    private int? addPersonStationId;
+    private string newPersonInput = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stations = await QueueService.GetStationsAsync();
+        QueueService.Changed += OnQueueChanged;
+    }
+
+    // Called when any browser changes the data
+    private Task OnQueueChanged() => InvokeAsync(async () =>
+    {
+        stations = await QueueService.GetStationsAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => QueueService.Changed -= OnQueueChanged;
 
     // --- Station Card Management ---
     private void OpenAddStationModal() => showAddStationModal = true;
@@ -112,48 +117,38 @@
         newStationNameInput = string.Empty;
     }
 
-    private void CreateStation()
+    private async Task CreateStation()
     {
         if (!string.IsNullOrWhiteSpace(newStationNameInput))
         {
-            stations.Add(new StationCard
-            {
-                StationName = newStationNameInput.Trim()
-            });
+            await QueueService.AddStationAsync(newStationNameInput.Trim());
             CloseAddStationModal();
         }
     }
 
-    private void DeleteStation(StationCard station)
-    {
-        stations.Remove(station);
-    }
+    private Task DeleteStation(int stationId) => QueueService.DeleteStationAsync(stationId);
 
     // --- Queue Management Inside Each Card ---
-    private void OpenAddPersonModal(StationCard station) => station.ShowAddPersonModal = true;
-    private void CloseAddPersonModal(StationCard station)
+    private void OpenAddPersonModal(Station station)
     {
-        station.ShowAddPersonModal = false;
-        station.NewPersonInput = string.Empty;
+        addPersonStationId = station.Id;
+        newPersonInput = string.Empty;
     }
 
-    private void AddPersonToStation(StationCard station)
+    private void CloseAddPersonModal()
     {
-        if (!string.IsNullOrWhiteSpace(station.NewPersonInput))
-        {
-            station.Queue.Add(new Person
-            {
-                Name = station.NewPersonInput.Trim(),
-                TicketNumber = station.LocalTicketCounter++ // Increments only THIS card's counter
-            });
+        addPersonStationId = null;
+        newPersonInput = string.Empty;
+    }
 
-            CloseAddPersonModal(station);
+    private async Task AddPersonToStation(Station station)
+    {
+        if (!string.IsNullOrWhiteSpace(newPersonInput))
+        {
+            await QueueService.AddPersonAsync(station.Id, newPersonInput.Trim());
+            CloseAddPersonModal();
         }
     }
 
-    private void RemovePersonFromQueue(StationCard station, Person person)
-    {
-        station.Queue.Remove(person);
-    }
+    private Task RemovePersonFromQueue(int personId) => QueueService.RemovePersonAsync(personId);
 }
-    

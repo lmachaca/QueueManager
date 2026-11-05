@@ -1,4 +1,6 @@
 using Listing.Components;
+using Listing.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,7 +8,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// SQLite database shared by every browser
+builder.Services.AddDbContextFactory<QueueDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("QueueDb")));
+builder.Services.AddSingleton<QueueService>();
+
 var app = builder.Build();
+
+// Create the database file and tables on first run
+using (var db = app.Services.GetRequiredService<IDbContextFactory<QueueDbContext>>().CreateDbContext())
+{
+    db.Database.EnsureCreated();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
